@@ -260,7 +260,7 @@ class PhotoCullerApp:
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
 
-        self.file_list = tk.Listbox(list_frame, activestyle="none")
+        self.file_list = tk.Listbox(list_frame, activestyle="none", selectmode=tk.EXTENDED)
         self.file_list.grid(row=0, column=0, sticky="nsew")
         self.file_list.bind("<<ListboxSelect>>", self.on_select)
         self.file_list.bind("<Up>", lambda _event: self._handle_arrow_key(-1))
@@ -316,24 +316,41 @@ class PhotoCullerApp:
         self.commit_delete_button = ttk.Button(actions, text="删除已标记", command=self.commit_marked_deletions)
         self.commit_delete_button.grid(row=0, column=4, padx=(8, 0))
 
+        self.batch_actions = ttk.Frame(actions, padding=(0, 6, 0, 0))
+        self.batch_actions.grid(row=1, column=0, columnspan=5, sticky="ew")
+
+        self.batch_selection_label = ttk.Label(self.batch_actions, text="")
+        self.batch_selection_label.grid(row=0, column=0, sticky="w", padx=(0, 12))
+
+        self.batch_keep_button = ttk.Button(self.batch_actions, text="批量保留", command=self.batch_keep)
+        self.batch_keep_button.grid(row=0, column=1, padx=(0, 8))
+        self.batch_delete_button = ttk.Button(self.batch_actions, text="批量标记删除", command=self.batch_delete)
+        self.batch_delete_button.grid(row=0, column=2, padx=(0, 8))
+        self.batch_skip_button = ttk.Button(self.batch_actions, text="批量跳过", command=self.batch_skip)
+        self.batch_skip_button.grid(row=0, column=3, padx=(0, 8))
+        self.batch_restore_button = ttk.Button(self.batch_actions, text="批量恢复", command=self.batch_restore)
+        self.batch_restore_button.grid(row=0, column=4)
+
         hint = ttk.Label(
             actions,
             text=(
                 f"Delete 只做删除标记。当前预缓存 {self.preview_cache_size} 张，"
-                f"向前预读 {self.preview_lookahead} 张。"
+                f"向前预读 {self.preview_lookahead} 张。Shift/Ctrl 可多选。"
             ),
         )
-        hint.grid(row=1, column=0, columnspan=5, sticky="w", pady=(8, 0))
+        hint.grid(row=2, column=0, columnspan=5, sticky="w", pady=(6, 0))
         self.hint_label = hint
 
     def _bind_shortcuts(self) -> None:
-        self.root.bind("<Delete>", lambda _event: self.delete_current())
-        self.root.bind("<Return>", lambda _event: self.keep_current())
-        self.root.bind("<KP_Enter>", lambda _event: self.keep_current())
-        self.root.bind("<Key-s>", lambda _event: self.skip_current())
-        self.root.bind("<Key-S>", lambda _event: self.skip_current())
-        self.root.bind("<Key-z>", lambda _event: self.restore_current())
-        self.root.bind("<Key-Z>", lambda _event: self.restore_current())
+        self.root.bind("<Delete>", self._shortcut_delete)
+        self.root.bind("<Return>", self._shortcut_keep)
+        self.root.bind("<KP_Enter>", self._shortcut_keep)
+        self.root.bind("<Key-s>", self._shortcut_skip)
+        self.root.bind("<Key-S>", self._shortcut_skip)
+        self.root.bind("<Key-z>", self._shortcut_restore)
+        self.root.bind("<Key-Z>", self._shortcut_restore)
+        self.root.bind("<Control-a>", self._shortcut_select_all)
+        self.root.bind("<Control-A>", self._shortcut_select_all)
 
     def choose_folder(self) -> None:
         initial_dir = str(self.current_folder) if self.current_folder else str(Path.home())
@@ -625,10 +642,52 @@ class PhotoCullerApp:
         selection = self.file_list.curselection()
         if not selection:
             return
-        self.current_index = selection[0]
-        self._show_current()
+        self.current_index = selection[-1]
+        if len(selection) > 1:
+            self._show_multi_selection(selection)
+        else:
+            self._show_current()
         self._update_controls()
+        self._update_multi_selection_label()
         self._save_state()
+
+    def _show_multi_selection(self, indices: list[int]) -> None:
+        count = len(indices)
+        statuses = {}
+        for index in indices:
+            if 0 <= index < len(self.entries):
+                s = self.entries[index].status
+                statuses[s] = statuses.get(s, 0) + 1
+
+        parts = [f"已选中 {count} 张照片"]
+        for status_name, cnt in sorted(statuses.items(), key=lambda x: -x[1]):
+            label = {
+                "pending": "待处理",
+                "kept": "已保留",
+                "deleted": "已标记删除",
+                "skipped": "已跳过",
+            }.get(status_name, status_name)
+            parts.append(f"{label}: {cnt} 张")
+        self.title_var.set(" | ".join(parts))
+
+        has_raw = sum(
+            1 for i in indices if 0 <= i < len(self.entries) and self.entries[i].raw_paths
+        )
+        info_lines = [f"共选中 {count} 张照片"]
+        if has_raw:
+            info_lines.append(f"其中 {has_raw} 张匹配到原始文件")
+        info_lines.append("按 Enter 保留 / Del 标记删除 / S 跳过 / Z 恢复")
+        self.info_var.set("\n".join(info_lines))
+
+        self.preview_image = None
+        self.preview_label.configure(text=f"已选中 {count} 张照片\n使用按钮或快捷键进行批量操作", image="")
+
+    def _update_multi_selection_label(self) -> None:
+        selected = self._get_selected_indices()
+        if len(selected) > 1:
+            self.batch_selection_label.configure(text=f"已选中 {len(selected)} 张照片")
+        else:
+            self.batch_selection_label.configure(text="")
 
     def _show_current(self) -> None:
         if self.current_index is None or not self.entries:
@@ -644,7 +703,7 @@ class PhotoCullerApp:
             f"匹配到的原始文件：{len(entry.raw_paths)} 个",
         ]
         if entry.status == "deleted":
-            info_lines.append("提示：这张照片已标记删除，点击“删除已标记”后会移到回收站。")
+            info_lines.append("提示：这张照片已标记删除，点击「删除已标记」后会移到回收站。")
         if entry.raw_paths:
             info_lines.extend(f"  - {raw_path.name}" for raw_path in entry.raw_paths)
         self.info_var.set("\n".join(info_lines))
@@ -683,6 +742,7 @@ class PhotoCullerApp:
         self.file_list.see(index)
         self.current_index = index
         self._show_current()
+        self._update_multi_selection_label()
         self._save_state()
 
     def _move_selection(self, delta: int) -> None:
@@ -728,6 +788,27 @@ class PhotoCullerApp:
         except OSError as exc:
             messagebox.showerror("打开失败", f"无法在资源管理器中定位文件：\n\n{photo_path}\n\n{exc}")
 
+    def _shortcut_keep(self, _event=None) -> None:
+        self.keep_current()
+
+    def _shortcut_delete(self, _event=None) -> None:
+        self.delete_current()
+
+    def _shortcut_skip(self, _event=None) -> None:
+        self.skip_current()
+
+    def _shortcut_restore(self, _event=None) -> None:
+        self.restore_current()
+
+    def _shortcut_select_all(self, _event=None) -> str:
+        if not self.entries:
+            return "break"
+        self.file_list.selection_clear(0, tk.END)
+        self.file_list.selection_set(0, tk.END)
+        self._update_controls()
+        self._update_multi_selection_label()
+        return "break"
+
     def _advance_to_next(self) -> None:
         if not self.entries:
             self.current_index = None
@@ -767,17 +848,36 @@ class PhotoCullerApp:
     def keep_current(self) -> None:
         if self.current_index is None:
             return
-        self._mark_current("kept")
-        self._advance_to_next()
+        selected = self._get_selected_indices()
+        if len(selected) > 1:
+            self._mark_entries(selected, "kept")
+            self._advance_after_batch(selected)
+        else:
+            self._mark_current("kept")
+            self._advance_to_next()
 
     def skip_current(self) -> None:
         if self.current_index is None:
             return
-        self._mark_current("skipped")
-        self._advance_to_next()
+        selected = self._get_selected_indices()
+        if len(selected) > 1:
+            self._mark_entries(selected, "skipped")
+            self._advance_after_batch(selected)
+        else:
+            self._mark_current("skipped")
+            self._advance_to_next()
 
     def delete_current(self) -> None:
         if self.current_index is None:
+            return
+
+        selected = self._get_selected_indices()
+        if len(selected) > 1:
+            applicable = [i for i in selected if 0 <= i < len(self.entries) and self.entries[i].status != "deleted"]
+            if not applicable:
+                return
+            self._mark_entries(applicable, "deleted")
+            self._advance_after_batch(applicable)
             return
 
         entry = self.entries[self.current_index]
@@ -797,6 +897,11 @@ class PhotoCullerApp:
         if self.current_index is None:
             return
 
+        selected = self._get_selected_indices()
+        if len(selected) > 1:
+            self.batch_restore()
+            return
+
         entry = self.entries[self.current_index]
         if entry.status != "deleted":
             return
@@ -808,7 +913,85 @@ class PhotoCullerApp:
         self._update_summary()
         self._save_state()
 
+    def _get_selected_indices(self) -> list[int]:
+        return list(self.file_list.curselection())
+
+    def _clear_multi_selection(self) -> None:
+        self.file_list.selection_clear(0, tk.END)
+        self.file_list.selection_set(self.current_index)
+
+    def _mark_entries(self, indices: list[int], status: str) -> None:
+        if not indices:
+            return
+        for index in indices:
+            if 0 <= index < len(self.entries):
+                self.entries[index].status = status
+                self._update_list_row(index)
+        self._update_summary()
+        self._update_controls()
+        self._save_state()
+
+    def _advance_after_batch(self, changed_indices: list[int]) -> None:
+        if not self.entries:
+            self.current_index = None
+            self._clear_preview("当前文件夹中没有找到可处理的照片。")
+            self._update_controls()
+            return
+        max_changed = max(changed_indices) if changed_indices else (self.current_index or 0)
+        for index in range(max_changed + 1, len(self.entries)):
+            if self.entries[index].status != "deleted":
+                self._set_selection(index)
+                self._update_controls()
+                return
+        for index in range(len(self.entries)):
+            if self.entries[index].status != "deleted":
+                self._set_selection(index)
+                self._update_controls()
+                return
+        target = min(max(self.current_index if self.current_index is not None else 0, 0), len(self.entries) - 1)
+        self._set_selection(target)
+        self._update_controls()
+
+    def batch_keep(self) -> None:
+        indices = self._get_selected_indices()
+        if not indices:
+            return
+        self._mark_entries(indices, "kept")
+        self._advance_after_batch(indices)
+
+    def batch_delete(self) -> None:
+        indices = self._get_selected_indices()
+        if not indices:
+            return
+        applicable = [i for i in indices if 0 <= i < len(self.entries) and self.entries[i].status != "deleted"]
+        if not applicable:
+            return
+        self._mark_entries(applicable, "deleted")
+        self._advance_after_batch(applicable)
+
+    def batch_skip(self) -> None:
+        indices = self._get_selected_indices()
+        if not indices:
+            return
+        self._mark_entries(indices, "skipped")
+        self._advance_after_batch(indices)
+
+    def batch_restore(self) -> None:
+        indices = self._get_selected_indices()
+        if not indices:
+            return
+        applicable = [i for i in indices if 0 <= i < len(self.entries) and self.entries[i].status == "deleted"]
+        if not applicable:
+            return
+        self._mark_entries(applicable, "pending")
+        last = max(applicable) if applicable else None
+        if last is not None:
+            self._set_selection(last)
+        self._update_controls()
+
     def _update_controls(self) -> None:
+        selected = self._get_selected_indices()
+        is_multi = len(selected) > 1
         state = "normal" if self.current_index is not None else "disabled"
         self.keep_button.configure(state=state)
         self.delete_button.configure(state=state)
@@ -821,6 +1004,20 @@ class PhotoCullerApp:
         self.restore_button.configure(state=restore_state)
         has_deleted = any(entry.status == "deleted" for entry in self.entries)
         self.commit_delete_button.configure(state="normal" if has_deleted else "disabled")
+
+        batch_state = "normal" if is_multi else "disabled"
+        self.batch_keep_button.configure(state=batch_state)
+        self.batch_delete_button.configure(state=batch_state)
+        self.batch_skip_button.configure(state=batch_state)
+        if is_multi:
+            has_deleted_selected = any(
+                self.entries[i].status == "deleted"
+                for i in selected
+                if 0 <= i < len(self.entries)
+            )
+            self.batch_restore_button.configure(state="normal" if has_deleted_selected else "disabled")
+        else:
+            self.batch_restore_button.configure(state="disabled")
 
     def commit_marked_deletions(self) -> None:
         deleted_entries = [entry for entry in self.entries if entry.status == "deleted"]
