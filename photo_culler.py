@@ -2,6 +2,7 @@ import ctypes
 import json
 import os
 import queue
+import subprocess
 import sys
 import threading
 from collections import OrderedDict
@@ -264,6 +265,10 @@ class PhotoCullerApp:
         self.file_list.bind("<<ListboxSelect>>", self.on_select)
         self.file_list.bind("<Up>", lambda _event: self._handle_arrow_key(-1))
         self.file_list.bind("<Down>", lambda _event: self._handle_arrow_key(1))
+        self.file_list.bind("<Button-3>", self._show_file_list_context_menu)
+
+        self.file_list_menu = tk.Menu(self.root, tearoff=False)
+        self.file_list_menu.add_command(label="打开所在文件夹", command=self.open_current_folder)
 
         list_scroll = ttk.Scrollbar(list_frame, orient="vertical", command=self.file_list.yview)
         list_scroll.grid(row=0, column=1, sticky="ns")
@@ -693,6 +698,35 @@ class PhotoCullerApp:
     def _handle_arrow_key(self, delta: int) -> str:
         self._move_selection(delta)
         return "break"
+
+    def _show_file_list_context_menu(self, event: tk.Event) -> str:
+        if not self.entries:
+            return "break"
+
+        index = self.file_list.nearest(event.y)
+        if index < 0 or index >= len(self.entries):
+            return "break"
+
+        self._set_selection(index)
+        self._update_controls()
+        self.file_list_menu.tk_popup(event.x_root, event.y_root)
+        self.file_list_menu.grab_release()
+        return "break"
+
+    def open_current_folder(self) -> None:
+        if self.current_index is None or not (0 <= self.current_index < len(self.entries)):
+            return
+
+        photo_path = self.entries[self.current_index].jpg_path
+        folder = photo_path.parent
+        if not folder.is_dir():
+            messagebox.showerror("目录不存在", f"无法打开所在文件夹：\n\n{folder}")
+            return
+
+        try:
+            subprocess.Popen(["explorer.exe", f"/select,{photo_path}"])
+        except OSError as exc:
+            messagebox.showerror("打开失败", f"无法在资源管理器中定位文件：\n\n{photo_path}\n\n{exc}")
 
     def _advance_to_next(self) -> None:
         if not self.entries:
