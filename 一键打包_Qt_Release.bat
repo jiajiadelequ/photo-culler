@@ -14,26 +14,18 @@ if not exist "%PY%" (
     exit /b 1
 )
 
-set DIST=E:\picture_tool\dist_release
-set WORK=E:\picture_tool\build_qt_rel
-
 echo [*] Full rebuild for release...
-if exist "%WORK%" rmdir /s /q "%WORK%"
-if exist "%DIST%" rmdir /s /q "%DIST%"
+if exist build_qt_rel rmdir /s /q build_qt_rel
 
-echo [*] Building single EXE...
-"%PY%" -m PyInstaller PhotoCullerQt.spec ^
-    --distpath "%DIST%" ^
-    --workpath "%WORK%" ^
+echo [*] Building single EXE to dist_release ...
+"%PY%" -m PyInstaller PhotoCullerQt_release.spec ^
+    --distpath dist_release ^
+    --workpath build_qt_rel ^
     --noconfirm ^
-    --onefile ^
     --log-level WARN
 
 if %errorlevel% equ 0 (
-    echo.
-    echo ============================================
-    echo   Done - %DIST%\照片筛选_Qt.exe
-    echo ============================================
+    echo   Done - dist_release\照片筛选_Qt.exe
 ) else (
     echo [ERROR] Build failed
 )

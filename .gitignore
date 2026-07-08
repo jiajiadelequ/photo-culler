@@ -3,9 +3,10 @@ __pycache__/
 
 # PyInstaller
 build/
-build_qt/
+build_qt*/
 dist_release/
 dist_dev/
+*.spec.bak
 
 # 其他工具数据
 .workbuddy/

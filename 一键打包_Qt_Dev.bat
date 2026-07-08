@@ -1,7 +1,7 @@
 @echo off
 cd /d %~dp0
 echo ============================================
-echo   Dev Build - PhotoCuller Qt (onedir, fast)
+echo   Dev Build - PhotoCuller Qt (onedir)
 echo ============================================
 
 set "PY=E:\python-envs\photo-culler-qt\Scripts\python.exe"
@@ -14,29 +14,22 @@ if not exist "%PY%" (
     exit /b 1
 )
 
-set DIST=E:\picture_tool\dist_dev
-set WORK=E:\picture_tool\build_qt
-
-if not "%1"=="clean" (
-    echo [*] Incremental build (build_qt cache kept)
-    echo     Use: 一键打包_Qt_Dev.bat clean   to force rebuild
-) else (
+if "%1"=="clean" (
     echo [*] Full rebuild...
-    if exist "%WORK%" rmdir /s /q "%WORK%"
+    if exist build_qt_dev rmdir /s /q build_qt_dev
+) else (
+    echo [*] Incremental (keep cache)
 )
 
-echo [*] Building to %DIST% ...
-"%PY%" -m PyInstaller PhotoCullerQt.spec ^
-    --distpath "%DIST%" ^
-    --workpath "%WORK%" ^
+echo [*] Building to dist_dev ...
+"%PY%" -m PyInstaller PhotoCullerQt_dev.spec ^
+    --distpath dist_dev ^
+    --workpath build_qt_dev ^
     --noconfirm ^
     --log-level WARN
 
 if %errorlevel% equ 0 (
-    echo.
-    echo ============================================
-    echo   Done - %DIST%\照片筛选_Qt.exe
-    echo ============================================
+    echo   Done - dist_dev\照片筛选_Qt\
 ) else (
     echo [ERROR] Build failed
 )
