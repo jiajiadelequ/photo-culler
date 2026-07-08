@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+
+# PyInstaller
+build/
+build_qt/
+dist_release/
+
+# 其他工具数据
+.workbuddy/
+.reasonix/
+reasonix.toml
