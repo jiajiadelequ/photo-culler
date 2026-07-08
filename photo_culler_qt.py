@@ -494,7 +494,10 @@ class PhotoCullerWindow(QMainWindow):
     # ── 文件夹操作 ───────────────────────────────────────
 
     def choose_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
+        start_dir = str(self.current_folder) if self.current_folder else str(Path.home())
+        if not Path(start_dir).exists():
+            start_dir = str(Path.home())
+        folder = QFileDialog.getExistingDirectory(self, "选择图片文件夹", start_dir)
         if not folder:
             return
         self.pending_restore_photo = None
