@@ -555,7 +555,11 @@ class PhotoCullerWindow(QMainWindow):
 
     def _set_selection(self, index: int) -> None:
         self._file_list.blockSignals(True)
+        self._file_list.clearSelection()
         self._file_list.setCurrentRow(index)
+        item = self._file_list.item(index)
+        if item:
+            self._file_list.scrollToItem(item)
         self._file_list.blockSignals(False)
         self.current_index = index
         self._show_current()
@@ -661,6 +665,7 @@ class PhotoCullerWindow(QMainWindow):
             return
         self.entries[self.current_index].status = "kept"
         self._update_list_row(self.current_index)
+        self._update_summary()
         self._set_selection(self.current_index)
         self._advance_to_next()
         self._save_state()
@@ -683,6 +688,7 @@ class PhotoCullerWindow(QMainWindow):
         entry.status = "deleted"
         idx = self.current_index
         self._update_list_row(idx)
+        self._update_summary()
         self._set_selection(idx)
         self._advance_to_next()
         self._save_state()
@@ -697,6 +703,7 @@ class PhotoCullerWindow(QMainWindow):
             return
         self.entries[self.current_index].status = "skipped"
         self._update_list_row(self.current_index)
+        self._update_summary()
         self._set_selection(self.current_index)
         self._advance_to_next()
         self._save_state()
