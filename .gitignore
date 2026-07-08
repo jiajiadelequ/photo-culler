@@ -5,6 +5,7 @@ __pycache__/
 build/
 build_qt/
 dist_release/
+dist_dev/
 
 # 其他工具数据
 .workbuddy/

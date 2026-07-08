@@ -864,8 +864,8 @@ class PhotoCullerWindow(QMainWindow):
     # ── UI 更新 ──────────────────────────────────────────
 
     def _update_controls(self) -> None:
-        has_current = self.current_index is not None and self.entries
-        enabled = has_current
+        has_current = self.current_index is not None and len(self.entries) > 0
+        enabled = bool(has_current)
         self._btn_keep.setEnabled(enabled)
         self._btn_delete.setEnabled(enabled)
         self._btn_skip.setEnabled(enabled)
@@ -899,6 +899,17 @@ class PhotoCullerWindow(QMainWindow):
         else:
             self._lbl_batch.setText("")
 
+    def _update_summary(self) -> None:
+        total = len(self.entries)
+        kept = sum(1 for e in self.entries if e.status == "kept")
+        deleted = sum(1 for e in self.entries if e.status == "deleted")
+        skipped = sum(1 for e in self.entries if e.status == "skipped")
+        pending = total - kept - deleted - skipped
+        self._lbl_summary.setText(
+            f"共 {total} 项  |  待处理 {pending}  |  保留 {kept}"
+            f"  |  标记删除 {deleted}  |  跳过 {skipped}"
+        )
+
     def _push_undo(self, index: int, previous_status: str) -> None:
         """Record an action for Ctrl+Z undo."""
         self._undo_stack.append({"index": index, "previous_status": previous_status})
@@ -923,15 +934,6 @@ class PhotoCullerWindow(QMainWindow):
         """Save state on window close."""
         self._save_state()
         super().closeEvent(event)
-        total = len(self.entries)
-        kept = sum(1 for e in self.entries if e.status == "kept")
-        deleted = sum(1 for e in self.entries if e.status == "deleted")
-        skipped = sum(1 for e in self.entries if e.status == "skipped")
-        pending = total - kept - deleted - skipped
-        self._lbl_summary.setText(
-            f"共 {total} 项  |  待处理 {pending}  |  保留 {kept}"
-            f"  |  标记删除 {deleted}  |  跳过 {skipped}"
-        )
 
     def _update_image_info(self) -> None:
         pass  # 缩放等状态由 ImageGraphicsView 内部管理
