@@ -4,7 +4,7 @@
 实现了与 Tkinter 版本完全相同的功能：
 - 打开图片文件夹，浏览 JPG 照片
 - 自动匹配同目录 RAW 文件
-- Ctrl+滚轮缩放（QGraphicsView transform，零成本）
+- 鼠标滚轮缩放（QGraphicsView transform，零成本）
 - 鼠标拖拽平移
 - 保留 / 删除 / 跳过 / 恢复 标记
 - 快捷键、菜单、批量操作
@@ -235,18 +235,15 @@ class ImageGraphicsView(QGraphicsView):
     # ── 滚轮事件 ──────────────────────────────────────────
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # Ctrl + 滚轮 → 缩放
-            angle = event.angleDelta().y()
-            if angle == 0:
-                return
-            factor = ZOOM_STEP if angle > 0 else 1.0 / ZOOM_STEP
-            new_zoom = self._zoom_level * factor
-            if ZOOM_MIN <= new_zoom <= ZOOM_MAX:
-                self._zoom_level = new_zoom
-                self.scale(factor, factor)
-        else:
-            super().wheelEvent(event)
+        # 鼠标滚轮直接缩放（不要求 Ctrl）
+        angle = event.angleDelta().y()
+        if angle == 0:
+            return
+        factor = ZOOM_STEP if angle > 0 else 1.0 / ZOOM_STEP
+        new_zoom = self._zoom_level * factor
+        if ZOOM_MIN <= new_zoom <= ZOOM_MAX:
+            self._zoom_level = new_zoom
+            self.scale(factor, factor)
 
     # ── 双击 → 适应窗口 ───────────────────────────────────
 
