@@ -1,9 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+# 只收集实际用到的 PySide6 子模块，大幅加速打包
+from PyInstaller.utils.hooks import collect_submodules
 
-# 收集 PySide6 所有子模块和资源
-hiddenimports = collect_submodules('PySide6')
+hiddenimports = collect_submodules('PySide6.QtCore')
+hiddenimports += collect_submodules('PySide6.QtGui')
+hiddenimports += collect_submodules('PySide6.QtWidgets')
 
 a = Analysis(
     ['photo_culler_qt.py'],
@@ -30,7 +32,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,          # 关闭 UPX 压缩，开发阶段大幅提速
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,

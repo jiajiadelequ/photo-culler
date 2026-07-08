@@ -14,16 +14,21 @@ if not exist "%PY%" (
     exit /b 1
 )
 
-echo [1/2] Cleaning old build...
-if exist build_qt rmdir /s /q build_qt
+if "%1"=="clean" (
+    echo [*] Full rebuild (cleaning cache)...
+    if exist build_qt rmdir /s /q build_qt
+) else (
+    echo [*] Incremental build (keep cache for speed)
+    echo     Use: 一键打包_Qt.bat clean   to force full rebuild
+)
 
-echo [2/2] Building with PyInstaller...
-"%PY%" -m PyInstaller PhotoCullerQt.spec --distpath dist_release --workpath build_qt
+echo [*] Building...
+"%PY%" -m PyInstaller PhotoCullerQt.spec --distpath dist_release --workpath build_qt --noconfirm
 
 if %errorlevel% equ 0 (
     echo.
     echo ============================================
-    echo   Build OK -^> dist_release\PhotoCuller_Qt.exe
+    echo   Build OK -^> dist_release\照片筛选_Qt.exe
     echo ============================================
 ) else (
     echo.
