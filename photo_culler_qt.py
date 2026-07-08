@@ -289,6 +289,7 @@ class PhotoCullerWindow(QMainWindow):
         self.scan_request_id = 0
         self.is_scanning = False
         self.pending_restore_photo: str | None = None
+        self._undo_stack: list[dict] = []
 
         # 持久化
         self.last_session: dict = {"folder": None, "current_photo": None, "photo_statuses": {}}
@@ -463,12 +464,17 @@ class PhotoCullerWindow(QMainWindow):
 
     def keyPressEvent(self, event) -> None:
         key = event.key()
-        # 忽略修饰键
+        mod = event.modifiers()
+        # 忽略纯修饰键
         if key in (Qt.Key.Key_Control, Qt.Key.Key_Shift, Qt.Key.Key_Alt, Qt.Key.Key_Meta):
             super().keyPressEvent(event)
             return
+        # Ctrl+Z 撤回
+        if mod & Qt.KeyboardModifier.ControlModifier and key == Qt.Key.Key_Z:
+            self._undo_last_action()
+            return
         # Ctrl+A 全选
-        if event.modifiers() & Qt.KeyboardModifier.ControlModifier and key == Qt.Key.Key_A:
+        if mod & Qt.KeyboardModifier.ControlModifier and key == Qt.Key.Key_A:
             self._file_list.selectAll()
             self._update_batch_label()
             return
@@ -664,6 +670,7 @@ class PhotoCullerWindow(QMainWindow):
             self._advance_after_batch(selected)
             return
         self.entries[self.current_index].status = "kept"
+        self._push_undo(self.current_index, "pending")
         self._update_list_row(self.current_index)
         self._update_summary()
         self._set_selection(self.current_index)
@@ -687,6 +694,7 @@ class PhotoCullerWindow(QMainWindow):
             return
         entry.status = "deleted"
         idx = self.current_index
+        self._push_undo(idx, entry.status)
         self._update_list_row(idx)
         self._update_summary()
         self._set_selection(idx)
@@ -702,6 +710,7 @@ class PhotoCullerWindow(QMainWindow):
             self._advance_after_batch(selected)
             return
         self.entries[self.current_index].status = "skipped"
+        self._push_undo(self.current_index, "pending")
         self._update_list_row(self.current_index)
         self._update_summary()
         self._set_selection(self.current_index)
@@ -887,7 +896,30 @@ class PhotoCullerWindow(QMainWindow):
         else:
             self._lbl_batch.setText("")
 
-    def _update_summary(self) -> None:
+    def _push_undo(self, index: int, previous_status: str) -> None:
+        """Record an action for Ctrl+Z undo."""
+        self._undo_stack.append({"index": index, "previous_status": previous_status})
+        if len(self._undo_stack) > 50:
+            self._undo_stack.pop(0)
+
+    def _undo_last_action(self) -> None:
+        """Ctrl+Z: undo the last mark operation."""
+        if not self._undo_stack:
+            return
+        action = self._undo_stack.pop()
+        idx = action["index"]
+        if 0 <= idx < len(self.entries):
+            self.entries[idx].status = action["previous_status"]
+            self._update_list_row(idx)
+            self._update_summary()
+            self._set_selection(idx)
+            self._update_controls()
+            self._save_state()
+
+    def closeEvent(self, event) -> None:
+        """Save state on window close."""
+        self._save_state()
+        super().closeEvent(event)
         total = len(self.entries)
         kept = sum(1 for e in self.entries if e.status == "kept")
         deleted = sum(1 for e in self.entries if e.status == "deleted")
