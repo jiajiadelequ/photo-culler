@@ -321,7 +321,7 @@ class PhotoCullerWindow(QMainWindow):
         self._scan_timer.start(50)
 
         # 恢复上次会话
-        QTimer.singleShot(0, self._restore_last_session)
+        QTimer.singleShot(100, self._restore_last_session)
 
         self._update_controls()
         self._update_image_info()
@@ -967,7 +967,7 @@ class PhotoCullerWindow(QMainWindow):
     # ── 会话持久化（与 Tkinter 版本共用 STATE_FILE）───
 
     def _save_state(self) -> None:
-        if not self.current_folder:
+        if not self.current_folder or self.is_scanning:
             return
         data = {
             "folder": str(self.current_folder),
@@ -1004,6 +1004,7 @@ class PhotoCullerWindow(QMainWindow):
         self._lbl_folder.setText(str(folder_path))
         self.pending_restore_photo = data.get("current_photo")
         self.persisted_statuses = data.get("photo_statuses", {})
+        print(f"[Restore] folder={folder_path}, photo={self.pending_restore_photo}, statuses={len(self.persisted_statuses)}")
         self.entries.clear()
         self._file_list.clear()
         self._lbl_summary.setText("正在扫描...")
