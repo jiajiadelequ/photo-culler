@@ -10,3 +10,4 @@ dist_release/
 .workbuddy/
 .reasonix/
 reasonix.toml
+CodexShim.cs
