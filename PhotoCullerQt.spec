@@ -1,22 +1,67 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-# 只收集实际用到的 PySide6 子模块，大幅加速打包
-from PyInstaller.utils.hooks import collect_submodules
-
-hiddenimports = collect_submodules('PySide6.QtCore')
-hiddenimports += collect_submodules('PySide6.QtGui')
-hiddenimports += collect_submodules('PySide6.QtWidgets')
-
 a = Analysis(
     ['photo_culler_qt.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=hiddenimports,
+    hiddenimports=[
+        # QtCore
+        'PySide6.QtCore',
+        # QtGui
+        'PySide6.QtGui',
+        # QtWidgets + 我们实际用到的子模块
+        'PySide6.QtWidgets',
+        # Pillow 需要的
+        'PIL',
+        'PIL.Image',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # 排除用不到的 PySide6 大模块
+        'PySide6.QtBluetooth',
+        'PySide6.QtDBus',
+        'PySide6.QtDesigner',
+        'PySide6.QtHelp',
+        'PySide6.QtLocation',
+        'PySide6.QtMultimedia',
+        'PySide6.QtMultimediaWidgets',
+        'PySide6.QtNetwork',
+        'PySide6.QtNfc',
+        'PySide6.QtOpenGL',
+        'PySide6.QtOpenGLWidgets',
+        'PySide6.QtPdf',
+        'PySide6.QtPdfWidgets',
+        'PySide6.QtPositioning',
+        'PySide6.QtPrintSupport',
+        'PySide6.QtQml',
+        'PySide6.QtQuick',
+        'PySide6.QtQuick3D',
+        'PySide6.QtQuickControls2',
+        'PySide6.QtQuickWidgets',
+        'PySide6.QtRemoteObjects',
+        'PySide6.QtScxml',
+        'PySide6.QtSensors',
+        'PySide6.QtSerialPort',
+        'PySide6.QtSerialBus',
+        'PySide6.QtSql',
+        'PySide6.QtStateMachine',
+        'PySide6.QtSvg',
+        'PySide6.QtSvgWidgets',
+        'PySide6.QtTest',
+        'PySide6.QtTextToSpeech',
+        'PySide6.QtUiTools',
+        'PySide6.QtWebChannel',
+        'PySide6.QtWebEngine',
+        'PySide6.QtWebEngineCore',
+        'PySide6.QtWebEngineQuick',
+        'PySide6.QtWebEngineWidgets',
+        'PySide6.QtWebSockets',
+        'PySide6.QtXml',
+        'PySide6.QtXmlPatterns',
+    ],
     noarchive=False,
     optimize=0,
 )
@@ -32,7 +77,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,          # 关闭 UPX 压缩，开发阶段大幅提速
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
