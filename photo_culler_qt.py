@@ -1174,11 +1174,12 @@ class PhotoCullerWindow(QMainWindow):
             lines.append("提示：该视频已标记删除，只有点击“删除已标记视频”后才会移动到回收站。")
         return "\n".join(lines)
 
-    def _load_video_source(self, entry: VideoEntry, source_path: Path, using_proxy: bool):
+    def _load_video_source(self, entry, source_path, using_proxy=False):
         if self._video_load_state == "stopping":
-            LOGGER.info("Video load queued — state=stopping, storing pending")
+            LOGGER.info("Video load queued — state=stopping, updating pending + restarting poll")
             self._video_pending_source = source_path
             self._video_pending_entry = entry
+            self._start_load_poll()
             return
         self._video_load_state = "stopping"
         self._video_pending_source = source_path
