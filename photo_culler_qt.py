@@ -2382,6 +2382,9 @@ class PhotoCullerWindow(QMainWindow):
         self._video_state_store = self._load_mode_state("video")
         self.recent_sessions = self._photo_state_store.get("recent_sessions", [])
         self._refresh_recent_menu()
+        # 如果当前模式已有文件夹在扫描，不要覆盖
+        if self.is_scanning or self.current_folder is not None:
+            return
         folder = self._photo_state_store.get("last_directory")
         if folder and Path(folder).is_dir():
             self.current_folder = Path(folder)
@@ -2395,7 +2398,7 @@ class PhotoCullerWindow(QMainWindow):
             self._scan_folder(self.current_folder)
             self._add_recent_folder(folder)
         last = load_json_file(SETTINGS_FILE, {}).get("last_mode", "photo")
-        if last == "video":
+        if last == "video" and not self.is_scanning:
             QTimer.singleShot(300, lambda: self._switch_mode("video"))
 
     def _restore_video_session(self):
