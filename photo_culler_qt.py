@@ -549,6 +549,9 @@ class PhotoCullerWindow(QMainWindow):
             self._lbl_list_title.setText("视频列表")
             self._image_view.setVisible(False)
             self._video_widget.setVisible(True)
+            if not self.entries and self.current_folder is None:
+                self._restore_video_session()
+                return
         # 刷新列表
         self._file_list.blockSignals(True)
         self._file_list.clear()
@@ -926,6 +929,8 @@ class PhotoCullerWindow(QMainWindow):
             }
             try: STATE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
             except OSError: pass
+        else:
+            self._save_video_state()
 
     def _save_video_state(self):
         if not self.current_folder or self.is_scanning: return
@@ -953,6 +958,19 @@ class PhotoCullerWindow(QMainWindow):
             if self._mode != "photo": self._switch_mode("photo")
             self._scan_folder(self.current_folder)
             self._add_recent_folder(folder)
+
+    def _restore_video_session(self):
+        try: data = json.loads(VIDEO_STATE_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError): return
+        folder = data.get("folder")
+        if not folder or not Path(folder).is_dir(): return
+        self.current_folder = Path(folder); self._lbl_folder.setText(str(folder))
+        self.pending_restore_video = data.get("current_video")
+        self.persisted_statuses = data.get("video_statuses", {})
+        self.entries.clear(); self._file_list.clear()
+        self._lbl_summary.setText("正在扫描...")
+        self._scan_folder(self.current_folder)
+        self._add_recent_folder(folder)
 
     # ── 后台线程 ──────────────────────────────────────
 
@@ -1011,7 +1029,12 @@ class PhotoCullerWindow(QMainWindow):
                     for i in range(start, len(self.entries)):
                         if str(self.entries[i].relative_path) == self.pending_restore_photo:
                             self._set_selection(i); self.pending_restore_photo = None; break
-                if self.current_index is None and self.entries and self.pending_restore_photo is None:
+                if self.pending_restore_video:
+                    for i in range(start, len(self.entries)):
+                        if str(self.entries[i].relative_path) == self.pending_restore_video:
+                            self._set_selection(i); self.pending_restore_video = None; break
+                restore_target = self.pending_restore_photo or self.pending_restore_video
+                if self.current_index is None and self.entries and restore_target is None:
                     self._set_selection(0)
                 self._update_summary(); self._update_controls()
             if done:
