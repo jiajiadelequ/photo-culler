@@ -864,6 +864,8 @@ class PhotoCullerWindow(QMainWindow):
         self._video_proxy_target: str | None = None
         self._video_proxy_output_path: str | None = None
         self._video_proxy_progress_text = ""
+        self._video_probe_switch_id = 0
+        self._video_proxy_switch_id = 0
         self._video_switch_id = 0
         self._video_switch_timer: QTimer | None = None
         self._video_pending_target: VideoEntry | None = None
@@ -1214,6 +1216,7 @@ class PhotoCullerWindow(QMainWindow):
             return
         self._cancel_video_probe()
         self._video_probe_target = str(source_path.resolve())
+        self._video_probe_switch_id = self._video_switch_id
         payload = {
             "source_path": str(source_path),
             "ffprobe_exe": self._video_tools["ffprobe"],
@@ -1239,6 +1242,7 @@ class PhotoCullerWindow(QMainWindow):
         self._cancel_video_proxy()
         output_path = self._proxy_path_for(source_path)
         self._video_proxy_target = str(source_path.resolve())
+        self._video_proxy_switch_id = self._video_switch_id
         self._video_proxy_output_path = str(output_path)
         payload = {
             "source_path": str(source_path),
@@ -1294,7 +1298,11 @@ class PhotoCullerWindow(QMainWindow):
                         if self._should_use_proxy_for_current_mode(info):
                             proxy_path = self._proxy_path_for(source_path)
                             if proxy_path.exists():
-                                self._show_video_entry(current)
+                                LOGGER.info("Probe found proxy, switch_id=%s current=%s", self._video_probe_switch_id, self._video_switch_id)
+                                if self._video_probe_switch_id == self._video_switch_id:
+                                    self._load_video_source(current, proxy_path, True)
+                                else:
+                                    LOGGER.info("Stale probe result ignored: old_switch=%s current=%s", self._video_probe_switch_id, self._video_switch_id)
                             else:
                                 self._start_video_proxy(source_path, info)
             elif payload.get("event") == "fatal":
@@ -1343,7 +1351,13 @@ class PhotoCullerWindow(QMainWindow):
                     current = self.entries[self.current_index]
                     current_path = str(current.video_path.resolve()) if hasattr(current, "video_path") else None
                     if current_path == payload.get("source_path") and self._video_quality_mode != "original":
-                        self._show_video_entry(current)
+                        LOGGER.info("Proxy finished, switch_id=%s current=%s", self._video_proxy_switch_id, self._video_switch_id)
+                        if self._video_proxy_switch_id == self._video_switch_id:
+                            current_position = self._video_widget.current_position()
+                            self._video_widget.prepare_restore(current_position)
+                            self._load_video_source(current, Path(payload["output_path"]), True)
+                        else:
+                            LOGGER.info("Stale proxy result ignored: old_switch=%s current=%s", self._video_proxy_switch_id, self._video_switch_id)
             elif event_type == "fatal":
                 LOGGER.error("Video proxy worker failed payload=%s", payload)
                 self._set_video_hint("流畅预览生成失败，已回退原片播放。")
