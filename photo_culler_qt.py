@@ -37,6 +37,7 @@ if sys.platform == "win32":
     os.environ.setdefault("QT_LOGGING_RULES", "qt.multimedia.*=true")
 
 from PySide6.QtCore import Qt, QTimer, QRectF, QPointF, QObject, QThread, Signal, QProcess
+from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtGui import (
     QAction, QKeySequence, QPixmap, QImage,
     QWheelEvent, QMouseEvent, QFont,
@@ -1212,6 +1213,7 @@ class PhotoCullerWindow(QMainWindow):
             return  # DO NOT set idle – only valid switch_id may change state
         status = self._video_widget.current_media_status()
         elapsed = time.monotonic() - self._video_stop_started_at
+        LOGGER.info("Poll: status=%s elapsed=%.1fs state=%s", status, elapsed, self._video_load_state)
         if status in (QMediaPlayer.MediaStatus.NoMedia, QMediaPlayer.MediaStatus.LoadedMedia):
             self._video_load_timer.stop()
             self._do_load_pending()
