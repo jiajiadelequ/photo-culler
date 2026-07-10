@@ -1172,6 +1172,10 @@ class PhotoCullerWindow(QMainWindow):
         return "\n".join(lines)
 
     def _load_video_source(self, entry: VideoEntry, source_path: Path, using_proxy: bool):
+        if self._video_load_state in ("stopping", "loading"):
+            LOGGER.info("Video load skipped — already in %s state", self._video_load_state)
+            return
+        self._video_load_state = "loading"
         restore_position = self.pending_restore_video_position
         self.pending_restore_video_position = 0
         LOGGER.info(
@@ -1185,6 +1189,7 @@ class PhotoCullerWindow(QMainWindow):
         )
         self._video_widget.prepare_restore(restore_position)
         self._video_widget.load(str(source_path), str(entry.video_path))
+        self._video_load_state = "playing"
         info = self._cached_probe_info(entry.video_path)
         self._lbl_info.setText(self._video_playback_text(entry, info, using_proxy))
 
