@@ -10,6 +10,8 @@ a = Analysis(
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
+        'PySide6.QtMultimedia',
+        'PySide6.QtMultimediaWidgets',
         'PIL',
         'PIL.Image',
     ],
@@ -18,8 +20,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         'PySide6.QtBluetooth', 'PySide6.QtDBus', 'PySide6.QtDesigner',
-        'PySide6.QtHelp', 'PySide6.QtLocation', 'PySide6.QtMultimedia',
-        'PySide6.QtMultimediaWidgets', 'PySide6.QtNetwork', 'PySide6.QtNfc',
+        'PySide6.QtHelp', 'PySide6.QtLocation', 'PySide6.QtNetwork', 'PySide6.QtNfc',
         'PySide6.QtOpenGL', 'PySide6.QtOpenGLWidgets', 'PySide6.QtPdf',
         'PySide6.QtPdfWidgets', 'PySide6.QtPositioning', 'PySide6.QtPrintSupport',
         'PySide6.QtQml', 'PySide6.QtQuick', 'PySide6.QtQuick3D',
