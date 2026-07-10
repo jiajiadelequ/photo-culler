@@ -960,6 +960,13 @@ class PhotoCullerWindow(QMainWindow):
             if self._mode != "photo": self._switch_mode("photo")
             self._scan_folder(self.current_folder)
             self._add_recent_folder(folder)
+        # 恢复上次模式
+        try:
+            last = json.loads(SETTINGS_FILE.read_text(encoding="utf-8")).get("last_mode", "photo")
+        except Exception:
+            last = "photo"
+        if last == "video":
+            QTimer.singleShot(300, lambda: self._switch_mode("video"))
 
     def _restore_video_session(self):
         try: data = json.loads(VIDEO_STATE_FILE.read_text(encoding="utf-8"))
