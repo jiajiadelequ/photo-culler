@@ -1175,17 +1175,27 @@ class PhotoCullerWindow(QMainWindow):
         if self._video_load_state in ("stopping", "loading"):
             LOGGER.info("Video load skipped — already in %s state", self._video_load_state)
             return
-        self._video_load_state = "loading"
+        self._video_load_state = "stopping"
         restore_position = self.pending_restore_video_position
         self.pending_restore_video_position = 0
         LOGGER.info(
-            "Video load request: original=%s source=%s using_proxy=%s quality=%s backend=%s requested_hw=%s",
-            entry.video_path,
-            source_path,
-            using_proxy,
-            self._video_quality_mode,
-            os.environ.get("QT_MEDIA_BACKEND", ""),
-            os.environ.get("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", ""),
+            "Video load stopping: original=%s next_source=%s",
+            entry.video_path, source_path,
+        )
+        self._video_widget.stop()
+        current_switch = self._video_switch_id
+        # 延迟 setSource，让 Qt 事件循环处理 stop 完成
+        QTimer.singleShot(50, lambda sid=current_switch: self._video_load_after_stop(sid, entry, source_path, using_proxy, restore_position))
+
+    def _video_load_after_stop(self, switch_id, entry, source_path, using_proxy, restore_position):
+        if switch_id != self._video_switch_id:
+            LOGGER.info("Stale load-after-stop ignored: old_switch=%s current=%s", switch_id, self._video_switch_id)
+            self._video_load_state = "idle"
+            return
+        self._video_load_state = "loading"
+        LOGGER.info(
+            "Video load setSource: original=%s source=%s using_proxy=%s",
+            entry.video_path, source_path, using_proxy,
         )
         self._video_widget.prepare_restore(restore_position)
         self._video_widget.load(str(source_path), str(entry.video_path))
