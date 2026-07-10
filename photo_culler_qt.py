@@ -870,6 +870,9 @@ class PhotoCullerWindow(QMainWindow):
         self._video_switch_timer: QTimer | None = None
         self._video_pending_target: VideoEntry | None = None
         self._video_load_state = "idle"
+        self._video_load_timer: QTimer | None = None
+        self._video_pending_source: Path | None = None
+        self._video_stop_started_at = 0.0
 
         self.recent_sessions: list[dict] = []
         self.persisted_statuses: dict[str, str] = {}
@@ -1172,36 +1175,67 @@ class PhotoCullerWindow(QMainWindow):
         return "\n".join(lines)
 
     def _load_video_source(self, entry: VideoEntry, source_path: Path, using_proxy: bool):
-        if self._video_load_state in ("stopping", "loading"):
-            LOGGER.info("Video load skipped — already in %s state", self._video_load_state)
+        if self._video_load_state == "stopping":
+            LOGGER.info("Video load queued — state=stopping, storing pending")
+            self._video_pending_source = source_path
+            self._video_pending_entry = entry
             return
         self._video_load_state = "stopping"
-        restore_position = self.pending_restore_video_position
-        self.pending_restore_video_position = 0
-        LOGGER.info(
-            "Video load stopping: original=%s next_source=%s",
-            entry.video_path, source_path,
-        )
+        self._video_pending_source = source_path
+        self._video_pending_entry = entry
+        LOGGER.info("Video load stopping: from=%s to=%s",
+                     self._video_widget.current_media_path() or "(none)", entry.video_path)
         self._video_widget.stop()
-        current_switch = self._video_switch_id
-        # 延迟 setSource，让 Qt 事件循环处理 stop 完成
-        QTimer.singleShot(50, lambda sid=current_switch: self._video_load_after_stop(sid, entry, source_path, using_proxy, restore_position))
+        self._video_stop_started_at = time.monotonic()
+        self._start_load_poll()
 
-    def _video_load_after_stop(self, switch_id, entry, source_path, using_proxy, restore_position):
+    def _start_load_poll(self):
+        if self._video_load_timer is None:
+            self._video_load_timer = QTimer(self)
+            self._video_load_timer.setInterval(80)
+        try:
+            self._video_load_timer.timeout.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+        current_switch = self._video_switch_id
+        self._video_load_timer.timeout.connect(lambda sid=current_switch: self._poll_for_load_ready(sid))
+        self._video_load_timer.start()
+
+    def _poll_for_load_ready(self, switch_id):
+        if self._video_load_state != "stopping":
+            self._video_load_timer.stop()
+            return
         if switch_id != self._video_switch_id:
-            LOGGER.info("Stale load-after-stop ignored: old_switch=%s current=%s", switch_id, self._video_switch_id)
+            LOGGER.info("Stale poll ignored: old_switch=%s current=%s", switch_id, self._video_switch_id)
+            self._video_load_timer.stop()
+            return  # DO NOT set idle – only valid switch_id may change state
+        status = self._video_widget.current_media_status()
+        elapsed = time.monotonic() - self._video_stop_started_at
+        if status in (QMediaPlayer.MediaStatus.NoMedia, QMediaPlayer.MediaStatus.LoadedMedia):
+            self._video_load_timer.stop()
+            self._do_load_pending()
+        elif elapsed > 3.0:
+            LOGGER.warning("Stop timeout after %.1fs, forcing load", elapsed)
+            self._video_load_timer.stop()
+            self._do_load_pending()
+
+    def _do_load_pending(self):
+        entry = self._video_pending_entry
+        source_path = self._video_pending_source
+        if entry is None or source_path is None:
             self._video_load_state = "idle"
             return
+        self._video_pending_source = None
+        self._video_pending_entry = None
         self._video_load_state = "loading"
-        LOGGER.info(
-            "Video load setSource: original=%s source=%s using_proxy=%s",
-            entry.video_path, source_path, using_proxy,
-        )
+        restore_position = self.pending_restore_video_position
+        self.pending_restore_video_position = 0
+        LOGGER.info("Video loading: original=%s source=%s", entry.video_path, source_path)
         self._video_widget.prepare_restore(restore_position)
         self._video_widget.load(str(source_path), str(entry.video_path))
         self._video_load_state = "playing"
         info = self._cached_probe_info(entry.video_path)
-        self._lbl_info.setText(self._video_playback_text(entry, info, using_proxy))
+        self._lbl_info.setText(self._video_playback_text(entry, info, False))
 
     def _cancel_video_probe(self):
         if self._video_probe_process is not None:
