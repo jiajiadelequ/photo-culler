@@ -1294,7 +1294,7 @@ class PhotoCullerWindow(QMainWindow):
                         if self._should_use_proxy_for_current_mode(info):
                             proxy_path = self._proxy_path_for(source_path)
                             if proxy_path.exists():
-                                self._load_video_source(current, proxy_path, True)
+                                self._show_video_entry(current)
                             else:
                                 self._start_video_proxy(source_path, info)
             elif payload.get("event") == "fatal":
@@ -1343,9 +1343,7 @@ class PhotoCullerWindow(QMainWindow):
                     current = self.entries[self.current_index]
                     current_path = str(current.video_path.resolve()) if hasattr(current, "video_path") else None
                     if current_path == payload.get("source_path") and self._video_quality_mode != "original":
-                        current_position = self._video_widget.current_position()
-                        self._video_widget.prepare_restore(current_position)
-                        self._load_video_source(current, Path(payload["output_path"]), True)
+                        self._show_video_entry(current)
             elif event_type == "fatal":
                 LOGGER.error("Video proxy worker failed payload=%s", payload)
                 self._set_video_hint("流畅预览生成失败，已回退原片播放。")
