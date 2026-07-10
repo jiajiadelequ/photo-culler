@@ -82,10 +82,11 @@ def load_settings() -> dict[str, int]:
             defaults[k] = max(1, min(data[k], 2000))
     return defaults
 
-def save_settings(cache_size: int, lookahead: int) -> None:
+def save_settings(cache_size: int, lookahead: int, last_mode: str = "photo") -> None:
     try:
         SETTINGS_FILE.write_text(json.dumps(
-            {"preview_cache_size": cache_size, "preview_lookahead": lookahead},
+            {"preview_cache_size": cache_size, "preview_lookahead": lookahead,
+             "last_mode": last_mode},
             ensure_ascii=False, indent=2), encoding="utf-8")
     except OSError:
         pass
@@ -872,6 +873,7 @@ class PhotoCullerWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._video_widget.dispose() if hasattr(self, '_video_widget') else None
+        save_settings(self.preview_cache_size, self.preview_lookahead, self._mode)
         self._save_state(); super().closeEvent(event)
 
     # ── 预加载设置 ────────────────────────────────────
